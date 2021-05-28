@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 import get from 'lodash.get'
 
 export * from './lib/api.js'
