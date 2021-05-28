@@ -1,0 +1,41 @@
+{
+  "name": "scrape-tableau",
+  "version": "0.0.0",
+  "description": "get data from tableau dashboards",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "lint": "standard",
+    "lintfix": "standard --fix",
+    "test": "uvu tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sethvincent/scrape-tableau.git"
+  },
+  "keywords": [
+    "tableau",
+    "scraper"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sethvincent/scrape-tableau/issues"
+  },
+  "homepage": "https://github.com/sethvincent/scrape-tableau#readme",
+  "devDependencies": {
+    "playwright": "^1.11.1",
+    "standard": "^16.0.3",
+    "uvu": "^0.5.1"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.9",
+    "desm": "^1.1.0",
+    "form-data": "^4.0.0",
+    "got": "^11.8.2",
+    "lodash.clonedeep": "^4.5.0",
+    "lodash.get": "^4.4.2",
+    "mri": "^1.1.6",
+    "tough-cookie": "^4.0.0"
+  }
+}
