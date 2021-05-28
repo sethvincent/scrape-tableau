@@ -1,6 +1,6 @@
 {
   "name": "scrape-tableau",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "get data from tableau dashboards",
   "main": "index.js",
   "type": "module",
