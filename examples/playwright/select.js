@@ -4,7 +4,7 @@ import * as dirname from 'desm'
 import { chromium } from 'playwright'
 import get from 'lodash.get'
 
-import { parseResponse, getDataValues, getWorksheet, getWorksheetsCmdResponse } from '../../index.js'
+import { parsePrefixedResponse, getDataValues, getWorksheet, getWorksheetsCmdResponse } from '../../index.js'
 
 const counties = [
   'bergen',
@@ -36,7 +36,7 @@ let currentCounty
 
 async function main () {
   const browser = await chromium.launch({
-    headless: false
+    headless: true
   })
 
   const context = await browser.newContext({
@@ -61,24 +61,25 @@ async function main () {
       const url = response.url()
       if (url.includes('bootstrap')) {
         const body = await response.body()
-        const [info, data] = parseResponse(body.toString())
+        const [info, data] = parsePrefixedResponse(body.toString())
 
         workbook.info = info
         workbook.data = data
         workbook.dataSegments = get(data, 'secondaryInfo.presModelMap.dataDictionary.presModelHolder.genDataDictionaryPresModel.dataSegments')
-        getDataValues(workbook.dataValues, workbook.dataSegments)
-        const ws = getWorksheet('Cases by Onset', workbook)
+        getDataValues(workbook, workbook.dataSegments)
+        const ws = getWorksheet(workbook, 'Cases by Onset')
         const filepath = dirname.join(import.meta.url, 'downloads', 'new-jersey.json')
         await fs.writeFile(filepath, JSON.stringify(ws, null, 2))
       }
 
       if (url.includes('select')) {
+        console.log('select url', url)
         const body = await response.body()
         const json = JSON.parse(body.toString())
-        const worksheets = getWorksheetsCmdResponse(json, workbook)
-        console.log('downloading county', currentCounty)
-        const filepath = dirname.join(import.meta.url, 'downloads', `${currentCounty}.json`)
-        await fs.writeFile(filepath, JSON.stringify(worksheets, null, 2))
+        // const worksheets = getWorksheetsCmdResponse(workbook, json)
+        // console.log('downloading county', currentCounty)
+        // const filepath = dirname.join(import.meta.url, 'downloads', `${currentCounty}.json`)
+        // await fs.writeFile(filepath, JSON.stringify(worksheets, null, 2))
       }
     })
 
@@ -92,7 +93,7 @@ async function main () {
   }
 
   await downloadWorksheets()
-  await browser.close()
+  // await browser.close()
 }
 
 main()

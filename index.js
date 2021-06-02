@@ -1,11 +1,89 @@
 import get from 'lodash.get'
+import clone from 'lodash.clonedeep'
 
 export * from './lib/api.js'
 
-export function parseResponse (responseBody) {
-  return responseBody.split(/\d{2,10};(?={.+})/)
-    .filter(s => s.length)
-    .map(t => JSON.parse(t))
+class Workbook {
+  constructor (config = {}) {
+
+  }
+
+  getWorksheetNames () {
+
+  }
+
+  getWorksheets () {
+
+  }
+
+  getSelectableItems () {
+
+  }
+
+  getSelectableValues () {
+
+  }
+}
+
+export function createWorkbook (bootstrapResponse) {
+  const [info, data] = bootstrapResponse
+  const dataSegments = get(data, 'secondaryInfo.presModelMap.dataDictionary.presModelHolder.genDataDictionaryPresModel.dataSegments')
+
+  const workbook = {
+    info,
+    data,
+    dataSegments,
+    dataValues: {},
+    worksheetNames: [],
+    worksheets: {},
+    selectableItems: null,
+    selectableValues: null
+  }
+
+  getDataValues(workbook)
+  workbook.worksheetNames = getWorksheetNames(workbook)
+  workbook.worksheets = getWorksheets(workbook)
+
+  return workbook
+}
+
+function worksheetList (presModelMap) {
+  return Object.keys(get(presModelMap, 'vizData.presModelHolder.genPresModelMapPresModel.presModelMap'))
+}
+
+export function getWorksheetNames (workbook) {
+  // TODO: command response variation
+  // if (this.cmdResponse) {
+  //   const presModel = get(this.originalData, 'vqlCmdResponse.layoutStatus.applicationPresModel')
+  //   return worksheetInfoList(presModel).map((item) => {
+  //     return item.worksheet
+  //   })
+  // } else {
+    let presModel = getPresModelVizData(workbook.data)
+
+    if (presModel) {
+      return worksheetList(presModel)
+    }
+
+    presModel = getPresModelVizInfo(workbook.info)
+
+    const worksheets = worksheetInfoList(presModel)
+
+    if (!worksheets.length) {
+      // TODO: check story points for worksheet names
+      // return this.listStoryPointsInfo(presModel)
+      return []
+    }
+
+    return worksheets
+  // }
+}
+
+export function getWorksheets (workbook) {
+  return workbook.worksheetNames.reduce((obj, name) => {
+    obj[name] = getWorksheet(workbook, name)
+    return obj
+  }, {})
 }
 
 export function getWorksheetsCmdResponse (selectApiResponse, workbook) {
@@ -17,7 +95,7 @@ export function getWorksheetsCmdResponse (selectApiResponse, workbook) {
   }
 
   const newDataSegments = get(presModel, 'dataDictionary.dataSegments')
-  getDataValues(workbook.dataValues, newDataSegments)
+  getDataValues(workbook, newDataSegments)
 
   const worksheets = zonesWithWorksheet.reduce((arr, selectedZone) => {
     const data = getWorksheetCmdResponse(selectedZone, workbook.dataValues)
@@ -32,7 +110,45 @@ export function getWorksheetsCmdResponse (selectApiResponse, workbook) {
   return worksheets
 }
 
-export function getWorksheet (worksheetName, workbook) {
+export function updateWorkbook (workbook, commandApiResponse) {
+  const presModel = getApplicationPresModel(commandApiResponse)
+  const newWorkbook = clone(workbook)
+  updateDataSegments(newWorkbook, presModel)
+  getDataValues(newWorkbook)
+  newWorkbook.worksheetNames = getWorksheetNames(newWorkbook)
+  newWorkbook.worksheets = updateWorksheets(newWorkbook, presModel)
+  return newWorkbook
+}
+
+export function getApplicationPresModel (apiResponse) {
+  return get(apiResponse, 'vqlCmdResponse.layoutStatus.applicationPresModel')
+}
+
+export function updateWorksheets (workbook, presModel) {
+  let zonesWithWorksheet = getZonesFromVizData(presModel)
+
+  if (!zonesWithWorksheet.length) {
+    zonesWithWorksheet = getZonesFromStoryPoints(presModel)
+  }
+
+  const newDataSegments = get(presModel, 'dataDictionary.dataSegments')
+  getDataValues(workbook, newDataSegments)
+
+  console.log('zonesWithWorksheet', zonesWithWorksheet)
+  const worksheets = zonesWithWorksheet.reduce((arr, selectedZone) => {
+    const data = getWorksheetCmdResponse(selectedZone, workbook.dataValues)
+
+    if (data) {
+      arr.push(data)
+    }
+
+    return arr
+  }, [])
+
+  return worksheets
+}
+
+export function getWorksheet (workbook, worksheetName) {
   let presModelMap = getPresModelVizData(workbook.data)
 
   let indicesInfo
@@ -50,20 +166,110 @@ export function getWorksheet (worksheetName, workbook) {
   return getData(workbook.dataValues, indicesInfo)
 }
 
-export function getDataValues (dataValues, newDataSegments) {
-  if (!newDataSegments) return dataValues
+export function getSelectableItems (workbook, worksheetName) {
+  // if (this.cmdResponse) {
+  //   const presModel = get(this.scraper.originalData, 'vqlCmdResponse.layoutStatus.applicationPresModel')
+
+  //   return getIndicesInfoVqlResponse(presModel, this.worksheetName).map((item) => {
+  //     const values = Object.values(getData(this.dataSegments, [item]))[0]
+
+  //     return {
+  //       column: item.fieldCaption,
+  //       values
+  //     }
+  //   })
+  // } else {
+    let presModel = getPresModelVizData(workbook.data)
+    let indicesInfo
+
+    if (!presModel) {
+      presModel = getPresModelVizInfo(workbook.info)
+      indicesInfo = getIndicesInfoStoryPoint(presModel, worksheetName)
+    } else {
+      indicesInfo = getIndicesInfo(presModel, worksheetName)
+    }
+    return indicesInfo.map((index) => {
+      const values = getData(workbook.dataValues, [index])
+
+      return {
+        column: index.fieldCaption,
+        values
+      }
+    })
+  // }
+}
+
+export function updateDataSegments (workbook, presModel) {
+  if (presModel.dataDictionary) {
+    const dataSegments = presModel.dataDictionary.dataSegments
+    const keys = Object.keys(dataSegments)
+
+    for (const key of keys) {
+      workbook.dataSegments[key] = dataSegments[key]
+    }
+  }
+}
+
+export function getDataSegments (workbook, presModelMap) {
+  let dataSegments = {}
+
+  if (presModelMap.dataDictionary && presModelMap.dataDictionary.presModelHolder) {
+    dataSegments = get(presModelMap, 'dataDictionary.presModelHolder.genDataDictionaryPresModel.dataSegments')
+  }
+
+  const dataSegmentsCopy = clone(dataSegments)
+  const originSegmentsCopy = clone(workbook.dataSegments)
+
+  let dataColumns = []
+
+  for (const [key, segment] of Object.entries(originSegmentsCopy)) {
+    dataColumns = [
+      ...dataColumns,
+      ...segment.dataColumns
+    ]
+  }
+
+  for (const [key, segment] of Object.entries(dataSegmentsCopy)) {
+    if (!originSegmentsCopy[key]) {
+      dataColumns = [
+        dataColumns,
+        ...segment.dataColumns
+      ]
+    }
+  }
+
+  const data = {}
+
+  for (const column of dataColumns) {
+    if (data[column.dataType]) {
+      data[column.dataType] = [
+        ...data[column.dataType],
+        ...column.dataValues
+      ]
+    } else {
+      data[column.dataType] = column.dataValues
+    }
+  }
+
+  return data
+}
+
+export function getDataValues (workbook, newDataSegments) {
+  if (!newDataSegments) {
+    newDataSegments = workbook.dataSegments
+  }
 
   for (const segment of Object.values(newDataSegments)) {
     for (const column of segment.dataColumns) {
-      if (!dataValues[column.dataType]) {
-        dataValues[column.dataType] = column.dataValues
+      if (!workbook.dataValues[column.dataType]) {
+        workbook.dataValues[column.dataType] = column.dataValues
       } else {
-        dataValues[column.dataType].push(...column.dataValues)
+        workbook.dataValues[column.dataType].push(...column.dataValues)
       }
     }
   }
 
-  return dataValues
+  return workbook.dataValues
 }
 
 export function getData (dataValues, indicesInfo) {
@@ -174,7 +380,8 @@ export function getIndicesInfo (presModel, worksheetName, options = {}) {
   }, [])
 }
 
-export function worksheetCmdResponseList (presModel) {
+export function getZonesFromVizData (presModel) {
+  console.log('getZonesFromVizData', presModel)
   const zones = get(presModel, 'workbookPresModel.dashboardPresModel.zones')
   const zoneKeys = Object.keys(zones)
   return zoneKeys.reduce((arr, key) => {
@@ -188,7 +395,7 @@ export function worksheetCmdResponseList (presModel) {
   }, [])
 }
 
-export function storyPointsCmdResponseList (presModel) {
+export function getZonesFromStoryPoints (presModel) {
   const zones = get(presModel, 'workbookPresModel.dashboardPresModel.zones')
 
   const storyPoints = Object.keys(zones).reduce((arr, key) => {
