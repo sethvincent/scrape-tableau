@@ -8,7 +8,49 @@ export function parseResponse (responseBody) {
     .map(t => JSON.parse(t))
 }
 
-export function getWorksheetsCmdResponse (selectApiResponse, workbook) {
+export function getWorksheetNames (workbook) {
+  let presModel = getPresModelVizData(workbook.data)
+
+  if (presModel) {
+    return worksheetList(presModel)
+  }
+
+  presModel = getPresModelVizInfo(workbook.info)
+
+  const worksheets = worksheetInfoList(presModel)
+
+  if (!worksheets.length) {
+    return []
+  }
+
+  return Object.keys(worksheets)
+}
+
+export function getWorksheet (workbook, worksheetName) {
+  let presModelMap = getPresModelVizData(workbook.data)
+
+  let indicesInfo
+  if (presModelMap) {
+    indicesInfo = getIndicesInfo(presModelMap, worksheetName)
+  } else {
+    presModelMap = getPresModelVizInfo(workbook.info)
+    indicesInfo = getIndicesInfoStoryPoint(presModelMap, worksheetName)
+
+    if (!presModelMap.dataDictionary) {
+      presModelMap = getPresModelVizDataWithoutViz(workbook.data)
+    }
+  }
+
+  return getData(workbook.dataValues, indicesInfo)
+}
+
+export function getWorksheets (workbook) {
+  return getWorksheetNames(workbook).map((name) => {
+    return getWorksheet(workbook, name)
+  })
+}
+
+export function getWorksheetsCmdResponse (workbook, selectApiResponse) {
   const presModel = get(selectApiResponse, 'vqlCmdResponse.layoutStatus.applicationPresModel')
   let zonesWithWorksheet = worksheetCmdResponseList(presModel)
 
@@ -30,24 +72,6 @@ export function getWorksheetsCmdResponse (selectApiResponse, workbook) {
   }, [])
 
   return worksheets
-}
-
-export function getWorksheet (worksheetName, workbook) {
-  let presModelMap = getPresModelVizData(workbook.data)
-
-  let indicesInfo
-  if (presModelMap) {
-    indicesInfo = getIndicesInfo(presModelMap, worksheetName)
-  } else {
-    presModelMap = getPresModelVizInfo(workbook.info)
-    indicesInfo = getIndicesInfoStoryPoint(presModelMap, worksheetName)
-
-    if (!presModelMap.dataDictionary) {
-      presModelMap = getPresModelVizDataWithoutViz(workbook.data)
-    }
-  }
-
-  return getData(workbook.dataValues, indicesInfo)
 }
 
 export function getDataValues (dataValues, newDataSegments) {
@@ -352,4 +376,23 @@ export function getWorksheetCmdResponse (selectedZone, dataSegments, options = {
   }, [])
 
   return getData(dataSegments, result)
+}
+
+function worksheetList (presModelMap) {
+  return Object.keys(get(presModelMap, 'vizData.presModelHolder.genPresModelMapPresModel.presModelMap'))
+}
+
+function worksheetInfoList (presModel) {
+  const zones = get(presModel, 'workbookPresModel.dashboardPresModel.zones')
+  const zoneKeys = Object.keys(zones)
+
+  return zoneKeys.reduce((arr, key) => {
+    const zone = zones[key]
+
+    if (get(zone, 'worksheet') && get(zone, 'presModelHolder.visual.vizData')) {
+      arr.push(zone.worksheet)
+    }
+
+    return arr
+  }, [])
 }

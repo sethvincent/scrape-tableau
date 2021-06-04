@@ -67,7 +67,7 @@ async function main () {
         workbook.data = data
         workbook.dataSegments = get(data, 'secondaryInfo.presModelMap.dataDictionary.presModelHolder.genDataDictionaryPresModel.dataSegments')
         getDataValues(workbook.dataValues, workbook.dataSegments)
-        const ws = getWorksheet('Cases by Onset', workbook)
+        const ws = getWorksheet(workbook, 'Cases by Onset')
         const filepath = dirname.join(import.meta.url, 'downloads', 'new-jersey.json')
         await fs.writeFile(filepath, JSON.stringify(ws, null, 2))
       }
@@ -75,7 +75,7 @@ async function main () {
       if (url.includes('select')) {
         const body = await response.body()
         const json = JSON.parse(body.toString())
-        const worksheets = getWorksheetsCmdResponse(json, workbook)
+        const worksheets = getWorksheetsCmdResponse(workbook, json)
         console.log('downloading county', currentCounty)
         const filepath = dirname.join(import.meta.url, 'downloads', `${currentCounty}.json`)
         await fs.writeFile(filepath, JSON.stringify(worksheets, null, 2))
